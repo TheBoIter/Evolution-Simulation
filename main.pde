@@ -1,35 +1,57 @@
 var clock = 489;
 var days = 0;
 var seed = 0;
-var nullvec = new PVector(0, 0);
-var tst = new PVector(500, 500);
-
 var plants = [];
-var gen_plants = function(c){
+var creatures = [];
+
+var nullvec;
+var tst;
+
+function display_terrain(night){
+    if(night === 0){
+        background(219, 250, 175);
+    }
+    else {
+        background(22, 69, 5);
+    }
+    if(night === 0){
+        stroke(89, 58, 7);
+    }
+    else {
+        stroke(166, 113, 7);
+    }
+    strokeWeight(1);
+    line(30, 30, 30, height-30);
+    line(30, 30, width-30, 30);
+    line(width-30, height-30, width-30, 30);
+    line(width-30, height-30, 30, height-30);
+    noStroke();
+}
+
+function gen_plants(c){
     if(c === 0){
         plants = [];
     }
     else {
-        var c = floor(random(30, 41));
-        for(var i = 0; i < c; i++){
+        var d = floor(random(30, 41));
+        for(var i = 0; i < d; i++){
             var px = random(30, width-30);
             var py = random(30, height-30);
             plants.push([px, py]);
         }
     }
-};
+}
 
-var display_plants = function(){
+function display_plants(){
     for(var i = 0; i < plants.length; i++){
         fill(0, 128, 0);
         noStroke();
         ellipse(plants[i][0], plants[i][1], 10, 10);
     }
-};
+}
 
-var creatures = [];
-var Creature = function(x, y, spd, sse, end){
-    this.pos = new PVector(x, y);
+function Creature(x, y, spd, sse, end){
+    this.pos = createVector(x, y);
     this.angle = 0;
     
     this.speed = spd;
@@ -47,10 +69,10 @@ var Creature = function(x, y, spd, sse, end){
     this.food = 0;
     this.target = nullvec;
     this.freeze = 0;
-};
+}
 
 Creature.prototype.display = function(){
-    pushMatrix();
+    push();
     translate(this.pos.x, this.pos.y);
     rotate(this.angle);
     if(this.freeze !== 0){
@@ -62,15 +84,15 @@ Creature.prototype.display = function(){
     fill(255, 255, 255);
     ellipse(6, 4, this.size*5, this.size*5);
     ellipse(6, -4, this.size*5, this.size*5);
-    popMatrix();
-};
+    pop();
+}
 
 Creature.prototype.walk = function(){
     if(this.energy === 0){
         return;
     }
     if(this.target !== nullvec){
-        this.angle = PVector.sub(this.target, this.pos).heading();
+        this.angle = p5.Vector.sub(this.target, this.pos).heading();
     }
     else {
         var d = floor(random(2));
@@ -101,7 +123,7 @@ Creature.prototype.walk = function(){
     }
     this.pos.x += this.speed*cos(this.angle);
     this.pos.y += this.speed*sin(this.angle);
-};
+}
 
 Creature.prototype.ret = function(){
     if(clock === 500){
@@ -171,7 +193,7 @@ Creature.prototype.ret = function(){
             }
         }
     }
-};
+}
 
 Creature.prototype.forage = function(){
     if(this.food >= 2){
@@ -180,11 +202,11 @@ Creature.prototype.forage = function(){
     }
     var exist = false;
     for(var i = plants.length-1; i >= 0; i--){
-        var v = new PVector(plants[i][0], plants[i][1]);
-        if(this.target === nullvec && PVector.sub(this.pos, v).mag() < this.sense){
+        var v = createVector(plants[i][0], plants[i][1]);
+        if(this.target === nullvec && p5.Vector.sub(this.pos, v).mag() < this.sense){
             this.target = v;
         }
-        if(PVector.sub(this.pos, v).mag() < 5){
+        if(p5.Vector.sub(this.pos, v).mag() < 5){
             this.food++;
             plants.splice(i, 1);
             this.target = nullvec;
@@ -197,7 +219,7 @@ Creature.prototype.forage = function(){
     if(!exist){
         this.target = nullvec;
     }
-};
+}
 
 Creature.prototype.replicate = function(){
     var mut = floor(random(-10, 11))/100;
@@ -227,7 +249,7 @@ Creature.prototype.replicate = function(){
     var c = new Creature(this.pos.x, this.pos.y, s, sse, end);
     c.sleep = true;
     creatures.push(c);
-};
+}
 
 Creature.prototype.update = function(){
     this.display();
@@ -239,56 +261,46 @@ Creature.prototype.update = function(){
         this.freeze--;
     }
     this.ret();
-};
-
-var display_terrain = function(night){
-    if(night === 0){
-        background(219, 250, 175);
-    }
-    else {
-        background(22, 69, 5);
-    }
-    if(night === 0){
-        stroke(89, 58, 7);
-    }
-    else {
-        stroke(166, 113, 7);
-    }
-    strokeWeight(1);
-    line(30, 30, 30, height-30);
-    line(30, 30, width-30, 30);
-    line(width-30, height-30, width-30, 30);
-    line(width-30, height-30, 30, height-30);
-    noStroke();
-};
-
-for(var i = 0; i < 10; i++){
-   creatures.push(new Creature(300, 300, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100));   
 }
 
-var outside = function(c){
+function outside(c){
     if(c.pos.x > 600 || c.pos.x < 0 || c.pos.y > 600 || c.pos.y < 0){
         return true;
     }
     return false;
-};
+}
 
-draw = function() {
+function setup() {
+  createCanvas(600,600);
+  background(0);
+  fill(255);
+  angleMode(DEGREES);
+  nullvec = createVector(0, 0);
+  tst = createVector(500, 500);
+  for(var i = 0; i < 10; i++){
+     creatures.push(new Creature(300, 300, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100));   
+  }
+}
+
+function draw() {
     background(0, 0, 0);
     clock++;
     if(clock === 2400){
         clock = 0;
     }
+    
     if(clock < 450 || clock > 2120){
         display_terrain(1);
     }
     else {
         display_terrain(0);
     }
+    
     fill(255,0,0);
     text("Time:"+clock, width-57, 10);
     text("Day "+days, width-57, 20);
     text("Population:"+creatures.length, width-80, height-10);
+    
     if(clock === 490){
         gen_plants(1);
     }
@@ -304,28 +316,28 @@ draw = function() {
     }
     if(clock === 0){
         var a = creatures.length-1;
-        for(var i = a; i >= 0; i--){
-            if(creatures[i].food === 0){
+        for(var j = a; j >= 0; j--){
+            if(creatures[j].food === 0){
                 var r = random(0, 1);
-                if(r > creatures[i].endr){
-                    creatures.splice(i, 1);
+                if(r > creatures[j].endr){
+                    creatures.splice(j, 1);
                     continue;
                 }
             }
-            if(creatures[i].pos.x !== 30 && creatures[i].pos.y !== 30 && creatures[i].pos.x !== width-30 && creatures[i].pos.y !== height-30){
-                creatures.splice(i, 1);
+            if(creatures[j].pos.x !== 30 && creatures[j].pos.y !== 30 && creatures[j].pos.x !== width-30 && creatures[j].pos.y !== height-30){
+                creatures.splice(j, 1);
                 continue;
             }
-            if(creatures[i].food >= 2){
-                creatures[i].replicate();
+            if(creatures[j].food >= 2){
+                creatures[j].replicate();
             }
-            creatures[i].food = 0;
-            creatures[i].energy = 200;
+            creatures[j].food = 0;
+            creatures[j].energy = 200;
         }
         days++;
     }
-};
+}
 
 mouseClicked = function(){
     creatures.push(new Creature(mouseX, mouseY, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100)); 
-};
+}
