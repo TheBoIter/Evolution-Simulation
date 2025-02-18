@@ -1,5 +1,6 @@
 var clock = 489;
 var days = 0;
+var det = 0;
 var seed = 0;
 var plants = [];
 var creatures = [];
@@ -33,7 +34,7 @@ function gen_plants(c){
         plants = [];
     }
     else {
-        var d = floor(random(30, 41));
+        var d = floor(random(90, 121));
         for(var i = 0; i < d; i++){
             var px = random(30, width-30);
             var py = random(30, height-30);
@@ -50,16 +51,16 @@ function display_plants(){
     }
 }
 
-function Creature(x, y, spd, sse, end){
+function Creature(x, y, spd, sse, end, sz){
     this.pos = createVector(x, y);
     this.angle = 0;
     
     this.speed = spd;
-    this.size = 1;
+    this.size = sz;
     this.sense = sse;
     this.endr = end;
     
-    this.energy = 240;
+    this.energy = 480;
     this.energyConsumption = (this.size*this.size*this.speed*this.speed/2+this.sense/1600)/(1-this.endr);
     
     this.id = seed;
@@ -69,6 +70,9 @@ function Creature(x, y, spd, sse, end){
     this.food = 0;
     this.target = nullvec;
     this.freeze = 0;
+    
+    this.prey = nullvec;
+    this.escape = nullvec;
 }
 
 Creature.prototype.display = function(){
@@ -91,9 +95,25 @@ Creature.prototype.walk = function(){
     if(this.energy === 0){
         return;
     }
-    if(this.target !== nullvec){
-        this.angle = p5.Vector.sub(this.target, this.pos).heading();
+    if(this.escape !== nullvec){
+        if(typeof(creatures[this.escape.x]) === 'object' && creatures[this.escape.x].id === this.escape.y && p5.Vector.sub(this.pos, creatures[this.escape.x].pos).mag() < this.sense/2 && !creatures[this.escape.x].sleep){
+            this.angle = p5.Vector.sub(this.pos, creatures[this.escape.x].pos).heading();
+        }
+        else {
+            this.escape = nullvec;
+        }
     }
+    else if(typeof(creatures[this.prey.x]) === 'object' && this.prey !== nullvec && this.food !== 2 && p5.Vector.sub(this.pos, creatures[this.escape.x].pos).mag() < this.sense){
+        if(creatures[this.prey.x].id === this.prey.y){
+            this.angle = p5.Vector.sub(creatures[this.prey.x].pos, this.pos).heading();
+        }
+        else {
+            this.prey = nullvec;
+        }
+    }
+    else if(this.target !== nullvec && this.food !== 2){
+        this.angle = p5.Vector.sub(this.target, this.pos).heading();
+    }   
     else {
         var d = floor(random(2));
         if(d === 0){
@@ -196,29 +216,79 @@ Creature.prototype.ret = function(){
 }
 
 Creature.prototype.forage = function(){
+    for(var i = creatures.length-1; i >= 0; i--){
+        if(creatures[i].size > 1.25*this.size && p5.Vector.sub(this.pos, creatures[i].pos).mag() < this.sense/2 && !creatures[i].sleep){
+            this.escape = createVector(i, creatures[i].id);
+        }
+    }
     if(this.food >= 2){
-        this.sleep = true;
         return;
     }
-    var exist = false;
-    for(var i = plants.length-1; i >= 0; i--){
-        var v = createVector(plants[i][0], plants[i][1]);
-        if(this.target === nullvec && p5.Vector.sub(this.pos, v).mag() < this.sense){
-            this.target = v;
+    if(this.food === 1){
+        for(var i = creatures.length-1; i >= 0; i--){
+            if(creatures[i].size < 0.8*this.size && this.target === nullvec && this.prey === nullvec && clock >= 800 && clock <= 1900 && p5.Vector.sub(this.pos, creatures[i].pos).mag() < this.sense){
+                this.prey = createVector(i, creatures[i].id);
+            }
+            if(p5.Vector.sub(this.pos, creatures[i].pos).mag() < 5 && creatures[i].size < 0.8*this.size){
+                this.food += 2;
+                creatures.splice(i, 1)
+                this.prey = nullvec;
+                this.freeze = 20;
+            }
         }
-        if(p5.Vector.sub(this.pos, v).mag() < 5){
-            this.food++;
-            plants.splice(i, 1);
+        var exist = false;
+        for(var i = plants.length-1; i >= 0; i--){
+            var v = createVector(plants[i][0], plants[i][1]);
+            if(this.target === nullvec && p5.Vector.sub(this.pos, v).mag() < this.sense){
+                this.target = v;
+            }
+            if(p5.Vector.sub(this.pos, v).mag() < 5){
+                this.food++;
+                plants.splice(i, 1);
+                this.target = nullvec;
+                this.freeze = 10;
+            }
+            if(v === this.target){
+                exist = true;
+            }
+        }
+        if(!exist){
             this.target = nullvec;
-            this.freeze = 10;
-        }
-        if(v === this.target){
-            exist = true;
         }
     }
-    if(!exist){
-        this.target = nullvec;
+    if(this.food === 0){
+         for(var i = creatures.length-1; i >= 0; i--){
+            if(creatures[i].size < 0.8*this.size && this.target === nullvec && this.prey === nullvec && clock >= 800 && clock <= 1900 && p5.Vector.sub(this.pos, creatures[i].pos).mag() < this.sense){
+                this.prey = createVector(i, creatures[i].id);
+            }
+            if(p5.Vector.sub(this.pos, creatures[i].pos).mag() < 5 && creatures[i].size < 0.8*this.size){
+                this.food += 2;
+                creatures.splice(i, 1)
+                this.prey = nullvec;
+                this.freeze = 20;
+            }
+        }
+        var exist = false;
+        for(var i = plants.length-1; i >= 0; i--){
+            var v = createVector(plants[i][0], plants[i][1]);
+            if(this.target === nullvec && p5.Vector.sub(this.pos, v).mag() < this.sense){
+                this.target = v;
+            }
+            if(p5.Vector.sub(this.pos, v).mag() < 5){
+                this.food++;
+                plants.splice(i, 1);
+                this.target = nullvec;
+                this.freeze = 10;
+            }
+            if(v === this.target){
+                exist = true;
+            }
+        }
+        if(!exist){
+            this.target = nullvec;
+        }
     }
+    
 }
 
 Creature.prototype.replicate = function(){
@@ -246,7 +316,15 @@ Creature.prototype.replicate = function(){
     if(end > 0.9){
         end = 0.9;
     }
-    var c = new Creature(this.pos.x, this.pos.y, s, sse, end);
+    mut = floor(random(-5, 6))/100;
+    var sz = this.size + mut;
+    if(sz < 0.4){
+        sz = 0.4;
+    }
+    if(sz > 2.0){
+        sz = 2.0;
+    }
+    var c = new Creature(this.pos.x, this.pos.y, s, sse, end, sz);
     c.sleep = true;
     creatures.push(c);
 }
@@ -264,27 +342,31 @@ Creature.prototype.update = function(){
 }
 
 function outside(c){
-    if(c.pos.x > 600 || c.pos.x < 0 || c.pos.y > 600 || c.pos.y < 0){
+    if(c.pos.x > width || c.pos.x < 0 || c.pos.y > height || c.pos.y < 0){
         return true;
     }
     return false;
 }
 
 function setup() {
-  createCanvas(600,600);
+  createCanvas(900,900);
   background(0);
   fill(255);
   angleMode(DEGREES);
   nullvec = createVector(0, 0);
   tst = createVector(500, 500);
-  for(var i = 0; i < 10; i++){
-     creatures.push(new Creature(300, 300, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100));   
+  for(var i = 0; i < 25; i++){
+     creatures.push(new Creature(floor(random(300, 701)), floor(random(300, 701)), floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(70, 130))/100));   
   }
 }
 
 function draw() {
     background(0, 0, 0);
-    clock++;
+    det++;
+    if(det === 1){
+        det = 0;
+        clock++;
+    }
     if(clock === 2400){
         clock = 0;
     }
@@ -309,14 +391,20 @@ function draw() {
     }
     display_plants();
     for(var i = creatures.length-1; i >= 0; i--){
-        creatures[i].update();
-        if(outside(creatures[i])){
+        if(typeof(creatures[i]) === 'object'){
+            creatures[i].update();
+        }
+        
+        if(typeof(creatures[i]) === Creature && outside(creatures[i])){
             creatures.splice(i, 1);
         }
     }
     if(clock === 0){
         var a = creatures.length-1;
         for(var j = a; j >= 0; j--){
+            if(typeof(creatures[j]) !== 'object'){
+                continue;
+            }
             if(creatures[j].food === 0){
                 var r = random(0, 1);
                 if(r > creatures[j].endr){
@@ -339,5 +427,5 @@ function draw() {
 }
 
 mouseClicked = function(){
-    creatures.push(new Creature(mouseX, mouseY, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100)); 
+    creatures.push(new Creature(mouseX, mouseY, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(70, 130))/100)); 
 }
