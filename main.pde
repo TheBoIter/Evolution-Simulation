@@ -5,21 +5,35 @@ var seed = 0;
 var plants = [];
 var creatures = [];
 
+var plant_amount = 100;
+var season = "drought";
+
 var nullvec;
 var tst;
 
 function display_terrain(night){
-    if(night === 0){
-        background(219, 250, 175);
+    if(season === 'lush'){
+        if(night === 0){
+            background(219, 250, 175);
+        }
+        else {
+            background(22, 69, 5);
+        }
+        if(night === 0){
+            stroke(89, 58, 7);
+        }
+        else {
+            stroke(166, 113, 7);
+        }
     }
-    else {
-        background(22, 69, 5);
-    }
-    if(night === 0){
-        stroke(89, 58, 7);
-    }
-    else {
-        stroke(166, 113, 7);
+    if(season === 'drought'){
+        if(night === 0){
+            background(246, 217, 103);
+        }
+        else {
+            background(134, 112, 20);
+        }
+        stroke(79, 0, 0);
     }
     strokeWeight(1);
     line(30, 30, 30, height-30);
@@ -34,11 +48,21 @@ function gen_plants(c){
         plants = [];
     }
     else {
-        var d = floor(random(90, 121));
+        var d = floor(random(plant_amount*0.8, plant_amount*1.2));
         for(var i = 0; i < d; i++){
             var px = random(30, width-30);
             var py = random(30, height-30);
             plants.push([px, py]);
+        }
+        if(season === 'lush'){
+            if(plant_amount < 120){
+                plant_amount += 5;
+            }
+        }
+        if(season === 'drought'){
+            if(plant_amount > 30){
+                plant_amount -= 5;
+            }
         }
     }
 }
@@ -60,8 +84,8 @@ function Creature(x, y, spd, sse, end, sz){
     this.sense = sse;
     this.endr = end;
     
-    this.energy = 480;
-    this.energyConsumption = (this.size*this.size*this.speed*this.speed/2+this.sense/1600)/(1-this.endr);
+    this.energy = 320;
+    this.energyConsumption = (this.size*this.size*this.speed*this.speed/2+this.sense/1600)/(1-this.endr*this.endr);
     
     this.id = seed;
     seed++;
@@ -84,10 +108,18 @@ Creature.prototype.display = function(){
         ellipse(0, 0, this.size*25, this.size*25);
     }
     fill(255*this.endr, 255*this.speed, this.sense*3);
+    strokeWeight(1);
+    stroke(50, 50, 50);
     ellipse(0, 0, this.size*20, this.size*20);
+    noStroke();
     fill(255, 255, 255);
-    ellipse(6, 4, this.size*5, this.size*5);
-    ellipse(6, -4, this.size*5, this.size*5);
+    if(this.size > 0.7){
+        ellipse(this.size*6, this.size*4, this.size*5, this.size*5);
+        ellipse(this.size*6, -this.size*4, this.size*5, this.size*5);
+    }
+    else {
+        ellipse(this.size*5, 0, this.size*8, this.size*8);
+    }
     pop();
 }
 
@@ -96,7 +128,7 @@ Creature.prototype.walk = function(){
         return;
     }
     if(this.escape !== nullvec){
-        if(typeof(creatures[this.escape.x]) === 'object' && creatures[this.escape.x].id === this.escape.y && p5.Vector.sub(this.pos, creatures[this.escape.x].pos).mag() < this.sense/2 && !creatures[this.escape.x].sleep){
+        if(typeof(creatures[this.escape.x]) === 'object' && creatures[this.escape.x].id === this.escape.y && p5.Vector.sub(this.pos, creatures[this.escape.x].pos).mag() < this.sense/2 && !creatures[this.escape.x].sleep && creatures[this.escape.x].prey !== nullvec){
             this.angle = p5.Vector.sub(this.pos, creatures[this.escape.x].pos).heading();
         }
         else {
@@ -217,7 +249,7 @@ Creature.prototype.ret = function(){
 
 Creature.prototype.forage = function(){
     for(var i = creatures.length-1; i >= 0; i--){
-        if(creatures[i].size > 1.25*this.size && p5.Vector.sub(this.pos, creatures[i].pos).mag() < this.sense/2 && !creatures[i].sleep){
+        if(creatures[i].size > 1.25*this.size && p5.Vector.sub(this.pos, creatures[i].pos).mag() < this.sense/2 && !creatures[i].sleep && random(0, 80) < this.sense){
             this.escape = createVector(i, creatures[i].id);
         }
     }
@@ -356,7 +388,7 @@ function setup() {
   nullvec = createVector(0, 0);
   tst = createVector(500, 500);
   for(var i = 0; i < 25; i++){
-     creatures.push(new Creature(floor(random(300, 701)), floor(random(300, 701)), floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(70, 130))/100));   
+     creatures.push(new Creature(floor(random(300, 701)), floor(random(300, 701)), floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(60, 140))/100));   
   }
 }
 
@@ -427,5 +459,5 @@ function draw() {
 }
 
 mouseClicked = function(){
-    creatures.push(new Creature(mouseX, mouseY, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(70, 130))/100)); 
+    creatures.push(new Creature(mouseX, mouseY, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(60, 140))/100)); 
 }
