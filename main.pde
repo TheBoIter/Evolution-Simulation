@@ -4,6 +4,8 @@ var det = 0;
 var seed = 0;
 var plants = [];
 var creatures = [];
+var dummy;
+var following = -1;
 
 var plant_amount = 100;
 var season = "lush";
@@ -67,7 +69,7 @@ function gen_plants(c){
         for(var i = 0; i < d; i++){
             var r = random(0, 1);
             var theta = random(0, 360);
-            r = sqrt(r)*water_size;
+            r = sqrt(r)*water_size/2;
             var p = p5.Vector.add(ctr, createVector(r*sin(theta), r*cos(theta)));
             plants.push([p.x, p.y]);
         }
@@ -110,7 +112,7 @@ function Creature(x, y, spd, sse, end, sz, aa){
     
     this.energy = 320;
     this.energyConsumption = (this.size*this.size*this.speed*this.speed/2+this.sense/1600)/(1-this.endr*this.endr);
-    this.oxygen = 500/(1-this.aquaAffinity);
+    this.oxygen = 350/(1-this.aquaAffinity);
     this.oxygenConsumption = 4*this.speed*this.speed*4*(1-this.aquaAffinity)*(1-this.aquaAffinity);
     this.landSpeed = this.speed*2*(1-this.aquaAffinity);
     this.waterSpeed = this.speed*this.aquaAffinity;
@@ -125,6 +127,8 @@ function Creature(x, y, spd, sse, end, sz, aa){
     
     this.prey = nullvec;
     this.escape = nullvec;
+    
+    this.isFollowed = false;
 }
 
 Creature.prototype.display = function(){
@@ -134,6 +138,18 @@ Creature.prototype.display = function(){
     fill(0, 0, 0);
     triangle(this.size*10, 0, -this.size*10, 0, 0, this.size*this.aquaAffinity*30);
     triangle(this.size*10, 0, -this.size*10, 0, 0, -this.size*this.aquaAffinity*30);
+    if(this.isFollowed){
+        fill(255, 0, 0);
+        ellipse(0, 0, this.size*25, this.size*25);
+        dummy = new Creature(this.pos.x, this.pos.y, this.speed, this.sense, this.endr, this.size, this.aquaAffinity);
+        dummy.pos.x = 950;
+        dummy.pos.y = 80;
+        dummy.oxygen = this.oxygen;
+        dummy.energy = this.energy;
+        dummy.id = this.id;
+        seed--;
+        dummy.food = this.food;
+    }
     if(this.freeze !== 0){
         fill(115, 115, 115);
         ellipse(0, 0, this.size*25, this.size*25);
@@ -144,7 +160,7 @@ Creature.prototype.display = function(){
     ellipse(0, 0, this.size*20, this.size*20);
     noStroke();
     fill(255, 255, 255);
-    if(this.size > 0.7){
+    if(this.size > 0.9){
         ellipse(this.size*6, this.size*4, this.size*5, this.size*5);
         ellipse(this.size*6, -this.size*4, this.size*5, this.size*5);
     }
@@ -230,6 +246,9 @@ Creature.prototype.ret = function(){
     if((2100-clock < d/this.landSpeed+20 && 2100-clock < d_w+20) || (eq > this.energy-5 && d_w*this.energyConsumption > this.energy-5)){
         this.sleep = true;
     }
+    if(!this.sleep){
+        this.energy -= this.energyConsumption;
+    }
     if(this.sleep){
         var oreq = 3150-clock;
         if(clock < 750){
@@ -238,6 +257,7 @@ Creature.prototype.ret = function(){
         if(d_w*this.energyConsumption < eq && this.oxygen > oreq*this.oxygenConsumption){
             if(p5.Vector.sub(ctr, this.pos).mag() > water_size/4-20){
                 this.angle = p5.Vector.sub(ctr, this.pos).heading();
+                this.energy -= this.energyConsumption;
             }
             if(this.energy > 0){
                 if(inWater(this)){
@@ -299,9 +319,6 @@ Creature.prototype.ret = function(){
                     this.angle = 270;
                 }
             }
-            if(!this.sleep){
-                this.energy -= this.energyConsumption;
-            }
             if(this.energy > 0){
                 if(inWater(this)){
                     this.pos.x += this.waterSpeed*cos(this.angle);
@@ -311,6 +328,7 @@ Creature.prototype.ret = function(){
                     this.pos.x += this.landSpeed*cos(this.angle);
                     this.pos.y += this.landSpeed*sin(this.angle);
                 }
+                this.energy -= this.energyConsumption;
             }
         }
     }
@@ -327,11 +345,17 @@ Creature.prototype.forage = function(){
     }
     if(this.food === 1){
         for(var i = creatures.length-1; i >= 0; i--){
+            if(typeof(creatures[i]) !== 'object'){
+                continue;
+            }
             if(creatures[i].size < 0.8*this.size && this.target === nullvec && this.prey === nullvec && clock >= 800 && clock <= 1900 && p5.Vector.sub(this.pos, creatures[i].pos).mag() < this.sense){
                 this.prey = createVector(i, creatures[i].id);
             }
             if(p5.Vector.sub(this.pos, creatures[i].pos).mag() < 5 && creatures[i].size < 0.8*this.size){
                 this.food += 2;
+                if(typeof(dummy) === 'object' && dummy.id === creatures[i].id){
+                    dummy = 0;
+                }
                 creatures.splice(i, 1)
                 this.prey = nullvec;
                 this.freeze = 20;
@@ -359,11 +383,17 @@ Creature.prototype.forage = function(){
     }
     if(this.food === 0){
          for(var i = creatures.length-1; i >= 0; i--){
+            if(typeof(creatures[i]) !== 'object'){
+                continue;
+            }
             if(creatures[i].size < 0.8*this.size && this.target === nullvec && this.prey === nullvec && clock >= 800 && clock <= 1900 && p5.Vector.sub(this.pos, creatures[i].pos).mag() < this.sense){
                 this.prey = createVector(i, creatures[i].id);
             }
             if(p5.Vector.sub(this.pos, creatures[i].pos).mag() < 5 && creatures[i].size < 0.8*this.size){
                 this.food += 2;
+                if(typeof(dummy) === 'object' && dummy.id === creatures[i].id){
+                    dummy = 0;
+                }
                 creatures.splice(i, 1)
                 this.prey = nullvec;
                 this.freeze = 20;
@@ -448,14 +478,14 @@ Creature.prototype.update = function(){
         this.freeze--;
     }
     this.ret();
-    if(inDeepWater(this) && this.aquaAffinity > 0.8){
-        this.oxygen = 1000/(1-this.aquaAffinity);
-    }
     if(inWater(this)){
         this.oxygen -= this.oxygenConsumption;
     }
     else {
         this.oxygen = 1000/(1-this.aquaAffinity);
+    }
+    if(this.energy < 0){
+        this.energy = 0;
     }
 }
 
@@ -481,7 +511,7 @@ function inDeepWater(c){
 }
 
 function setup() {
-  createCanvas(900,900);
+  createCanvas(1200,900);
   background(0);
   fill(255);
   angleMode(DEGREES);
@@ -512,6 +542,38 @@ function draw() {
         display_terrain(0);
     }
     
+    fill(205, 205, 205);
+    rect(910, 0, 290, 900, 50);
+    fill(0,0,0);
+    text("Creature Selected: ", 930, 30);
+    if(following === 1 && typeof(dummy) === 'object'){
+        dummy.display();
+        text("id: "+dummy.id, 930, 150);
+        text("size: "+round(dummy.size*1000)/1000, 930, 180);
+        text("speed: "+round(dummy.speed*1000)/1000, 930, 210);
+        text("speed on land: "+floor(dummy.landSpeed*1000)/1000, 980, 230);
+        text("speed in water: "+floor(dummy.waterSpeed*1000)/1000, 980, 250);
+        text("sense: "+dummy.sense, 930, 280);
+        text("endurance: "+round(dummy.endr*1000)/1000, 930, 310);
+        text("aqua affinity: "+round(dummy.aquaAffinity*1000)/1000, 930, 340);
+        text("oxygen: "+floor(dummy.oxygen), 930, 370);
+        text("energy: "+floor(dummy.energy*100)/100, 930, 400);
+        text("food: "+dummy.food, 930, 430);
+    }
+    else {
+        text("id: ", 930, 150);
+        text("size: ", 930, 180);
+        text("speed: ", 930, 210);
+        text("speed on land: ", 980, 230);
+        text("speed in water: ", 980, 250);
+        text("sense: ", 930, 280);
+        text("endurance: ", 930, 310);
+        text("aqua affinity: ", 930, 340);
+        text("oxygen: ", 930, 370);
+        text("energy: ", 930, 400);
+        text("food: ", 930, 430);
+    }
+    
     fill(255,0,0);
     text("Time:"+clock, 900-57, 10);
     text("Day "+days, 900-57, 20);
@@ -529,10 +591,16 @@ function draw() {
             creatures[i].update();
         }
         if(typeof(creatures[i]) === 'object' && creatures[i].oxygen <= 0){
+            if(dummy.id === creatures[i].id){
+                dummy = 0;
+            }
             creatures.splice(i, 1);
             continue;
         }
         if(typeof(creatures[i]) === 'object' && outside(creatures[i])){
+            if(dummy.id === creatures[i].id){
+                dummy = 0;
+            }
             creatures.splice(i, 1);
         }
     }
@@ -545,11 +613,17 @@ function draw() {
             if(creatures[j].food === 0){
                 var r = random(0, 1);
                 if(r > creatures[j].endr){
+                    if(dummy.id === creatures[j].id){
+                        dummy = 0;
+                    }
                     creatures.splice(j, 1);
                     continue;
                 }
             }
             if(creatures[j].pos.x !== 30 && creatures[j].pos.y !== 30 && creatures[j].pos.x !== 900-30 && creatures[j].pos.y !== 900-30 && p5.Vector.sub(creatures[j].pos, ctr).mag() >= water_size/4){
+                if(dummy.id === creatures[j].id){
+                    dummy = 0;
+                }
                 creatures.splice(j, 1);
                 continue;
             }
@@ -557,12 +631,30 @@ function draw() {
                 creatures[j].replicate();
             }
             creatures[j].food = 0;
-            creatures[j].energy = 200;
+            creatures[j].energy = 320;
         }
         days++;
     }
 }
 
 mouseClicked = function(){
-    creatures.push(new Creature(mouseX, mouseY, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(60, 140))/100, floor(random(300, 701))/1000)); 
+    //creatures.push(new Creature(mouseX, mouseY, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(60, 140))/100, floor(random(300, 701))/1000)); 
+    var found = 0;
+    for(var i = 0; i < creatures.length; i++){
+        if(p5.Vector.sub(createVector(mouseX, mouseY), creatures[i].pos).mag() < creatures[i].size*10){
+            following = 1;
+            for(var j = 0; j < creatures.length; j++){
+                creatures[j].isFollowed = false;
+            }
+            creatures[i].isFollowed = true;
+            found = 1;
+            break;
+        }
+    }
+    if(found === 0){
+        following = -1;
+        for(var j = 0; j < creatures.length; j++){
+            creatures[j].isFollowed = false;
+        }
+    }
 }
