@@ -6,10 +6,11 @@ var plants = [];
 var creatures = [];
 
 var plant_amount = 100;
-var season = "drought";
+var season = "lush";
+var water_size = 500;
 
 var nullvec;
-var tst;
+var ctr;
 
 function display_terrain(night){
     if(season === 'lush'){
@@ -35,11 +36,15 @@ function display_terrain(night){
         }
         stroke(79, 0, 0);
     }
+    fill(37, 187, 246);
+    ellipse(900/2, 900/2, water_size, water_size);
+    fill(5, 22, 174);
+    ellipse(900/2, 900/2, water_size/2, water_size/2);
     strokeWeight(1);
-    line(30, 30, 30, height-30);
-    line(30, 30, width-30, 30);
-    line(width-30, height-30, width-30, 30);
-    line(width-30, height-30, 30, height-30);
+    line(30, 30, 30, 900-30);
+    line(30, 30, 900-30, 30);
+    line(900-30, 900-30, 900-30, 30);
+    line(900-30, 900-30, 30, 900-30);
     noStroke();
 }
 
@@ -50,18 +55,36 @@ function gen_plants(c){
     else {
         var d = floor(random(plant_amount*0.8, plant_amount*1.2));
         for(var i = 0; i < d; i++){
-            var px = random(30, width-30);
-            var py = random(30, height-30);
+            var px = random(30, 900-30);
+            var py = random(30, 900-30);
+            while(p5.Vector.sub(ctr, createVector(px, py)).mag() < water_size/2){
+                px = random(30, 900-30);
+                py = random(30, 900-30);
+            }
             plants.push([px, py]);
+        }
+        d = floor(random(plant_amount*0.7, plant_amount*1.1));
+        for(var i = 0; i < d; i++){
+            var r = random(0, 1);
+            var theta = random(0, 360);
+            r = sqrt(r)*water_size;
+            var p = p5.Vector.add(ctr, createVector(r*sin(theta), r*cos(theta)));
+            plants.push([p.x, p.y]);
         }
         if(season === 'lush'){
             if(plant_amount < 120){
                 plant_amount += 5;
             }
+            if(water_size < 500){
+                water_size += 20;
+            }
         }
         if(season === 'drought'){
             if(plant_amount > 30){
                 plant_amount -= 5;
+            }
+            if(water_size > 200){
+                water_size -= 20;
             }
         }
     }
@@ -75,7 +98,7 @@ function display_plants(){
     }
 }
 
-function Creature(x, y, spd, sse, end, sz){
+function Creature(x, y, spd, sse, end, sz, aa){
     this.pos = createVector(x, y);
     this.angle = 0;
     
@@ -83,9 +106,14 @@ function Creature(x, y, spd, sse, end, sz){
     this.size = sz;
     this.sense = sse;
     this.endr = end;
+    this.aquaAffinity = aa;
     
     this.energy = 320;
     this.energyConsumption = (this.size*this.size*this.speed*this.speed/2+this.sense/1600)/(1-this.endr*this.endr);
+    this.oxygen = 500/(1-this.aquaAffinity);
+    this.oxygenConsumption = 4*this.speed*this.speed*4*(1-this.aquaAffinity)*(1-this.aquaAffinity);
+    this.landSpeed = this.speed*2*(1-this.aquaAffinity);
+    this.waterSpeed = this.speed*this.aquaAffinity;
     
     this.id = seed;
     seed++;
@@ -103,6 +131,9 @@ Creature.prototype.display = function(){
     push();
     translate(this.pos.x, this.pos.y);
     rotate(this.angle);
+    fill(0, 0, 0);
+    triangle(this.size*10, 0, -this.size*10, 0, 0, this.size*this.aquaAffinity*30);
+    triangle(this.size*10, 0, -this.size*10, 0, 0, -this.size*this.aquaAffinity*30);
     if(this.freeze !== 0){
         fill(115, 115, 115);
         ellipse(0, 0, this.size*25, this.size*25);
@@ -127,7 +158,12 @@ Creature.prototype.walk = function(){
     if(this.energy === 0){
         return;
     }
-    if(this.escape !== nullvec){
+    var o2r = (water_size/2-p5.Vector.sub(this.pos, ctr).mag())/this.waterSpeed*this.oxygenConsumption;
+    if(o2r > this.oxygen-10){
+        this.angle = p5.Vector.sub(this.pos, ctr).heading();
+        this.target = nullvec;
+    }
+    else if(this.escape !== nullvec){
         if(typeof(creatures[this.escape.x]) === 'object' && creatures[this.escape.x].id === this.escape.y && p5.Vector.sub(this.pos, creatures[this.escape.x].pos).mag() < this.sense/2 && !creatures[this.escape.x].sleep && creatures[this.escape.x].prey !== nullvec){
             this.angle = p5.Vector.sub(this.pos, creatures[this.escape.x].pos).heading();
         }
@@ -166,41 +202,68 @@ Creature.prototype.walk = function(){
         if(this.pos.y < this.sense && random(1, 20) < 2){
             this.angle = 90;
         }
-        if(this.pos.x > width-this.sense && random(1, 20) < 2){
+        if(this.pos.x > 900-this.sense && random(1, 20) < 2){
             this.angle = 180;
         }
-        if(this.pos.y > height-this.sense && random(1, 20) < 2){
+        if(this.pos.y > 900-this.sense && random(1, 20) < 2){
             this.angle = 270;
         }
     }
-    this.pos.x += this.speed*cos(this.angle);
-    this.pos.y += this.speed*sin(this.angle);
+    if(inWater(this)){
+        this.pos.x += this.waterSpeed*cos(this.angle);
+        this.pos.y += this.waterSpeed*sin(this.angle);
+    }
+    else {
+        this.pos.x += this.landSpeed*cos(this.angle);
+        this.pos.y += this.landSpeed*sin(this.angle);
+    }
 }
 
 Creature.prototype.ret = function(){
     if(clock === 500){
         this.sleep = false;
     }
-    var d = min(min(abs(this.pos.x-30),abs(width-30-this.pos.x)),min(abs(this.pos.y-30),abs(height-30-this.pos.y)));
-    var eq = d/this.speed*this.energyConsumption;
-    if(2100-clock < d/this.speed+20 || eq > this.energy-5){
+    var d = min(min(abs(this.pos.x-30),abs(900-30-this.pos.x)),min(abs(this.pos.y-30),abs(900-30-this.pos.y)));
+    var eq = d/this.landSpeed*this.energyConsumption;
+    var deepWater = false;
+    var d_w = max(p5.Vector.sub(this.pos, ctr).mag()-water_size/2, 0)/this.landSpeed+constrain(p5.Vector.sub(this.pos, ctr).mag()-water_size/4, 0, water_size/4)/this.waterSpeed;
+    if((2100-clock < d/this.landSpeed+20 && 2100-clock < d_w+20) || (eq > this.energy-5 && d_w*this.energyConsumption > this.energy-5)){
         this.sleep = true;
     }
     if(this.sleep){
-        if(abs(this.pos.x-30) < this.speed){
+        var oreq = 3150-clock;
+        if(clock < 750){
+            oreq = 750-clock;
+        }
+        if(d_w*this.energyConsumption < eq && this.oxygen > oreq*this.oxygenConsumption){
+            if(p5.Vector.sub(ctr, this.pos).mag() > water_size/4-20){
+                this.angle = p5.Vector.sub(ctr, this.pos).heading();
+            }
+            if(this.energy > 0){
+                if(inWater(this)){
+                    this.pos.x += this.waterSpeed*cos(this.angle);
+                    this.pos.y += this.waterSpeed*sin(this.angle);
+                }
+                else {
+                    this.pos.x += this.landSpeed*cos(this.angle);
+                    this.pos.y += this.landSpeed*sin(this.angle);
+                }
+            }
+        }
+        else if(abs(this.pos.x-30) < this.landSpeed){
             this.pos.x = 30;
             this.angle = 0;
         }
-        else if(abs(this.pos.y-30) < this.speed){
+        else if(abs(this.pos.y-30) < this.landSpeed){
             this.pos.y = 30;
             this.angle = 90;
         }
-        else if(abs(width-30-this.pos.x) < this.speed){
-            this.pos.x = width-30;
+        else if(abs(900-30-this.pos.x) < this.landSpeed){
+            this.pos.x = 900-30;
             this.angle = 180;
         }
-        else if(abs(height-30-this.pos.y) < this.speed){
-            this.pos.y = height-30;
+        else if(abs(900-30-this.pos.y) < this.landSpeed){
+            this.pos.y = 900-30;
             this.angle = 270;
         }
         else {
@@ -220,16 +283,16 @@ Creature.prototype.ret = function(){
                     this.angle = 90;
                 }
             }
-            if(d === abs(width-30-this.pos.x)){
-                if(this.pos.x < width-30){
+            if(d === abs(900-30-this.pos.x)){
+                if(this.pos.x < 900-30){
                     this.angle = 0;
                 }
                 else {
                     this.angle = 180;
                 }
             }
-            if(d === abs(height-30-this.pos.y)){
-                if(this.pos.y < height-30){
+            if(d === abs(900-30-this.pos.y)){
+                if(this.pos.y < 900-30){
                     this.angle = 90;
                 }
                 else {
@@ -240,8 +303,14 @@ Creature.prototype.ret = function(){
                 this.energy -= this.energyConsumption;
             }
             if(this.energy > 0){
-                this.pos.x += this.speed*cos(this.angle);
-                this.pos.y += this.speed*sin(this.angle);
+                if(inWater(this)){
+                    this.pos.x += this.waterSpeed*cos(this.angle);
+                    this.pos.y += this.waterSpeed*sin(this.angle);
+                }
+                else {
+                    this.pos.x += this.landSpeed*cos(this.angle);
+                    this.pos.y += this.landSpeed*sin(this.angle);
+                }
             }
         }
     }
@@ -356,7 +425,15 @@ Creature.prototype.replicate = function(){
     if(sz > 2.0){
         sz = 2.0;
     }
-    var c = new Creature(this.pos.x, this.pos.y, s, sse, end, sz);
+    mut = floor(random(-60, 61))/1000;
+    var aa = this.aquaAffinity + mut;
+    if(aa < 0.01){
+        aa = 0.01;
+    }
+    if(aa > 0.99){
+        aa = 0.99;
+    }
+    var c = new Creature(this.pos.x, this.pos.y, s, sse, end, sz, aa);
     c.sleep = true;
     creatures.push(c);
 }
@@ -371,10 +448,33 @@ Creature.prototype.update = function(){
         this.freeze--;
     }
     this.ret();
+    if(inDeepWater(this) && this.aquaAffinity > 0.8){
+        this.oxygen = 1000/(1-this.aquaAffinity);
+    }
+    if(inWater(this)){
+        this.oxygen -= this.oxygenConsumption;
+    }
+    else {
+        this.oxygen = 1000/(1-this.aquaAffinity);
+    }
 }
 
 function outside(c){
-    if(c.pos.x > width || c.pos.x < 0 || c.pos.y > height || c.pos.y < 0){
+    if(c.pos.x > 900 || c.pos.x < 0 || c.pos.y > 900 || c.pos.y < 0){
+        return true;
+    }
+    return false;
+}
+
+function inWater(c){
+    if(p5.Vector.sub(c.pos, ctr).mag() < water_size/2){
+        return true;
+    }
+    return false;
+}
+
+function inDeepWater(c){
+    if(p5.Vector.sub(c.pos, ctr).mag() < water_size/4){
         return true;
     }
     return false;
@@ -386,9 +486,11 @@ function setup() {
   fill(255);
   angleMode(DEGREES);
   nullvec = createVector(0, 0);
-  tst = createVector(500, 500);
+  ctr = createVector(900/2, 900/2);
   for(var i = 0; i < 25; i++){
-     creatures.push(new Creature(floor(random(300, 701)), floor(random(300, 701)), floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(60, 140))/100));   
+     var theta = random(0, 360);
+     var l = floor(random(water_size/2+1, water_size/2+100));
+     creatures.push(new Creature(cos(theta)*l+ctr.x, sin(theta)*l+ctr.y, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(60, 140))/100, floor(random(300, 701))/1000));   
   }
 }
 
@@ -411,9 +513,9 @@ function draw() {
     }
     
     fill(255,0,0);
-    text("Time:"+clock, width-57, 10);
-    text("Day "+days, width-57, 20);
-    text("Population:"+creatures.length, width-80, height-10);
+    text("Time:"+clock, 900-57, 10);
+    text("Day "+days, 900-57, 20);
+    text("Population:"+creatures.length, 900-80, 900-10);
     
     if(clock === 490){
         gen_plants(1);
@@ -426,8 +528,11 @@ function draw() {
         if(typeof(creatures[i]) === 'object'){
             creatures[i].update();
         }
-        
-        if(typeof(creatures[i]) === Creature && outside(creatures[i])){
+        if(typeof(creatures[i]) === 'object' && creatures[i].oxygen <= 0){
+            creatures.splice(i, 1);
+            continue;
+        }
+        if(typeof(creatures[i]) === 'object' && outside(creatures[i])){
             creatures.splice(i, 1);
         }
     }
@@ -444,7 +549,7 @@ function draw() {
                     continue;
                 }
             }
-            if(creatures[j].pos.x !== 30 && creatures[j].pos.y !== 30 && creatures[j].pos.x !== width-30 && creatures[j].pos.y !== height-30){
+            if(creatures[j].pos.x !== 30 && creatures[j].pos.y !== 30 && creatures[j].pos.x !== 900-30 && creatures[j].pos.y !== 900-30 && p5.Vector.sub(creatures[j].pos, ctr).mag() >= water_size/4){
                 creatures.splice(j, 1);
                 continue;
             }
@@ -459,5 +564,5 @@ function draw() {
 }
 
 mouseClicked = function(){
-    creatures.push(new Creature(mouseX, mouseY, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(60, 140))/100)); 
+    creatures.push(new Creature(mouseX, mouseY, floor(random(20, 81))/100, floor(random(20, 60)), floor(random(0, 80))/100, floor(random(60, 140))/100, floor(random(300, 701))/1000)); 
 }
